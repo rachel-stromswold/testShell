@@ -13,8 +13,10 @@
 typedef struct ProcessStruct{
 	pid_t procId;
 	int status;
+	int number;
 	char* name;
 	struct ProcessStruct* nextProcess;
+	struct ProcessStruct* prevProcess;
 } Process;
 
 #endif

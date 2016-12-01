@@ -1,16 +1,8 @@
 #include "io.h"
 
+extern void listJobs(int num);
 extern void dispatch(Command comm);
 extern void dispatchBackground(Command comm);
-
-void freeCommand(Command c){
-	//Command c=(*comm);
-	free(c.fname);
-	for(int i=0; c.argv[i]!=NULL;i++){
-		free(c.argv+i);
-	}
-	free(c.argv);
-}
 
 void printCommand(Command c){
 	for(int i=0; c.argv[i]!=NULL;i++){
@@ -55,8 +47,7 @@ Command processString(char* input){
 
 		char* token=strtok(input, " ");int i=0;
 		while(token!=NULL){	
-			ret.argv[i]=token;
-			printf("token %d: %s\n", i, token);
+			ret.argv[i]=token;	
 			i++;
 			token=strtok(NULL, " ");
 		}
@@ -72,13 +63,16 @@ Command processString(char* input){
 //	  1=continue running (no problems)
 //	  2=fatal error (quit)
 int execute(char* input){
-	printf("%s\n", input);
+	input[strlen(input)-1]=0;
+	//printf("%s\n", input);
 	Command comm=processString(input);
-	printCommand(comm);
+	//printCommand(comm);
 
 	if(strcmp(comm.fname, "quit")==0){
-		freeCommand(comm);
+		//freeCommand(comm);
 		return 0;
+	}else if(strcmp(comm.fname, "listjobs")==0){
+		listJobs(-1);
 	}else{//if it isn't any of the recognized built in commands, then do something else
 		if(comm.background){
 			dispatchBackground(comm);
@@ -87,7 +81,7 @@ int execute(char* input){
 		}
 	}
 
-	//freeCommand(comm);
+	//because of the way strtok works, we don't have to worry about memory leaks, the memory that holds the strings will be overwritten on the next call
 
 	return 1;
 }

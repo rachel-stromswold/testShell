@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-std=c99 -Wall -Wextra -Werror -Wformat=2 -g
-BINARY=cs350sh
+BINARY=superShell
 OBJ=dispatch.o io.o main.o
 .PHONY: clean
 
