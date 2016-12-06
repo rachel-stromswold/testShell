@@ -37,21 +37,42 @@ void moveToForeground(int pid){
 }
 
 //executes the command indicated by the command structure comm
-void dispatch(Command comm){
+//Command comm: the command structure to execute
+//int* fds; an array of file descriptors used for piping, set to null to indicate that the command does not recieve any piped input
+void dispatch(Command comm, int* p_fds){
+	int fds[2];
+	if(comm.pipeDest!=NULL && pipe(fds)==-1){
+		perror("Error creating pipe.");
+	}
+
 	pid_t procId;
 	procId=fork();
 	
 	if(procId<0){
 		printf("An error has occured forking the process.\n");
 	}else if(procId==0){
+		if(p_fds!=NULL){//if there is a pipe we are supposed to recieve from then use that as stdin
+			close(0);
+			dup2(p_fds[0], 0);
+		}
+		if(comm.pipeDest!=NULL){//if there is a pipe we are supposed to write to then use that as stdout
+			close(1);
+			dup2(fds[1], 1);
+		}
+
 		if(execvp(comm.fname, comm.argv)==-1)
 			printf("An error occured executing the process specified, %s, argc: %i.\n", comm.fname, comm.argc);
-
+	
 		exit(2);
 	}else if(procId>0){
 		int status=0;
 		waitpid(procId, &status, 0);
-	}
+
+		if(comm.pipeDest!=NULL){
+			close(fds[0]);close(fds[1]);//the parent does not need the read and write ends of the pipe
+			dispatch(*(comm.pipeDest), fds);
+		}
+	}	
 }
 
 //executes the command indicated by the command structure comm in the background (the user may run other processes while this command finishes execution)

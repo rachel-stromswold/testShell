@@ -1,7 +1,7 @@
 #include "io.h"
 
 extern void listJobs(int num);
-extern void dispatch(Command comm);
+extern void dispatch(Command comm, int* p_fds);
 extern void dispatchBackground(Command comm);
 extern void moveToForeground(int pid);
 
@@ -29,32 +29,69 @@ int countOccurances(char* src, char* delimiters){
 	return ret;
 }
 
+//fills data within a single command, mostly used to simplify the internal structure of the processString command, this will NOT properly handle pipes, for that use processString()
+//this does nothing to pipeDest
+void fillSingleCommand(char* command, Command* comm){
+	int commandLen=strlen(command);
+	char* commandDup;
+	if(command[commandLen-1]==' '){//if there is a space at the end of the string then we should eliminate it before processing
+		commandLen-=1;
+	}
+	if(command[0]==' '){
+		commandLen-=1;
+		commandDup=(char*)malloc(sizeof(char)*(commandLen+1));
+		strncpy(commandDup, command+1, commandLen);
+	}else{
+		commandDup=(char*)malloc(sizeof(char)*(commandLen+1));
+		strncpy(commandDup, command, commandLen);
+	}
+	commandDup[commandLen]=0;//ensure that our string is null terminated
+
+	(*comm).argc=countOccurances(commandDup, " ")+1;//plus one because of fencepost rule
+	if(commandDup[commandLen-1]=='&'){
+		(*comm).background=1;
+		(*comm).argc-=1;
+	}
+
+	(*comm).argv=(char**)malloc(((*comm).argc+1)*sizeof(char*));
+
+	char* token=strtok(commandDup, " ");int i=0;
+	while(token!=NULL){
+		(*comm).argv[i]=token;
+		i++;
+		token=strtok(NULL, " ");
+	}
+	(*comm).argv[(*comm).argc]=NULL;
+	(*comm).fname=(*comm).argv[0];
+
+	//don't free because the command internally uses each of these individual pieces
+	//free(commandDup);
+}
+
 //returns an easily parsable command from an input string
 Command processString(char* input){
 	int inputLen=strlen(input);
 	Command ret;
+	Command* bottom=&ret;
 	ret.background=0;//by default make the process not run in the background
 
 	if(inputLen<=0){
 		//printf("Error, improper input command.");
 		ret.fname="";
 	}else{
-		ret.argc=countOccurances(input, " ")+1;//plus one because of fencepost rule
-		if(input[inputLen-1]=='&'){
-			ret.background=1;
-			ret.argc-=1;
+		//go through every command divided by a pipe and assign the proper command
+		char* commands=strtok(input, "|");	
+		while(commands!=NULL){
+			fillSingleCommand(commands, bottom);
+			
+			commands=strtok(NULL, "|");
+			if(commands!=NULL){//if there are any more commands in the pipe stream, then make sure we get it on the next pass
+				(*bottom).pipeDest=(Command*)malloc(sizeof(Command));
+				bottom=(*bottom).pipeDest;
+			}else{//otherwise ensure that the current command does not have a child
+				(*bottom).pipeDest=NULL;
+			}
 		}
-
-		ret.argv=(char**)malloc((ret.argc+1)*sizeof(char*));
-
-		char* token=strtok(input, " ");int i=0;
-		while(token!=NULL){	
-			ret.argv[i]=token;	
-			i++;
-			token=strtok(NULL, " ");
-		}
-		ret.argv[ret.argc]=NULL;
-		ret.fname=ret.argv[0];
 	}
 
 	return ret;
@@ -87,7 +124,7 @@ int execute(char* input){
 		if(comm.background){
 			dispatchBackground(comm);
 		}else{
-			dispatch(comm);
+			dispatch(comm, NULL);
 		}
 	}
 
