@@ -8,7 +8,31 @@ void listJobs(int num){
 		Process* proc=first;
 		while(proc!=NULL){
 			printf("Command%d with PID %d: STATUS %d\n", (*proc).number, (*proc).procId, (*proc).status);
+			proc=(*proc).nextProcess;
 		}
+	}else{
+		Process* proc=last;
+		while(num>0 && proc!=NULL){
+			printf("Command%d with PID %d: STATUS %d\n", (*proc).number, (*proc).procId, (*proc).status);
+			proc=(*proc).prevProcess;
+			num--;
+		}
+	}
+}
+
+void moveToForeground(int pid){
+	Process* proc=first;
+	char validPid=0;//0 indicates that the input pid is not owned by the shell
+	while(proc!=NULL){
+		if((*proc).procId==pid){
+			validPid=1;
+		}
+		proc=(*proc).nextProcess;
+	}
+
+	if(validPid){
+		int status=0;
+		waitpid(pid, &status, 0);
 	}
 }
 
@@ -38,31 +62,37 @@ void dispatchBackground(Command comm){
 	if(procId<0){
 		printf("An error has occured forking the process.\n");
 	}else if(procId==0){
+		fclose(stdout);//close the normal stdout
+		fclose(stderr);
 		if(execvp(comm.fname, comm.argv)==-1)
 			printf("An error occured executing the process specified.\n");
 
 		exit(2);
 	}else if(procId>0){
-		Process np;
 		//if we haven't already created the first background job, then we will make this the first background job
 		if(last==NULL || first==NULL){
-			first=(Process*)malloc(sizeof(Process));
-			np=(*first);//this is just a convenient identifier for the new process
+			first=(Process*)malloc(sizeof(Process));	
 			last=first;
+			char* name=(char*)malloc((strlen(comm.fname)+1)*sizeof(char));
+			strcpy(name, comm.fname);
+			(*first).name=name;
+			(*first).status=0;
+			(*first).procId=procId;
+			(*first).number=(*last).number+1;
+			(*first).nextProcess=NULL;
+			(*first).prevProcess=last;
 		//otherwise make sure that the current last job points to the new job
 		}else{
 			(*last).nextProcess=(Process*)malloc(sizeof(Process));
-			np=(*((*last).nextProcess));//this is just a convenient identifier for the new process	
+			(*(*last).nextProcess).prevProcess=last;
 			last=(*last).nextProcess;
+			char* name=(char*)malloc((strlen(comm.fname)+1)*sizeof(char));
+			strcpy(name, comm.fname);
+			(*last).name=name;
+			(*last).status=0;
+			(*last).procId=procId;
+			(*last).number=(*last).number+1;
+			(*last).nextProcess=NULL;	
 		}
-
-		char* name=(char*)malloc((strlen(comm.fname)+1)*sizeof(char));
-		strcpy(name, comm.fname);
-		np.name=name;
-		np.status=0;
-		np.procId=procId;
-		np.number=(*last).number+1;
-		np.nextProcess=NULL;
-		np.prevProcess=last;
 	}
 }

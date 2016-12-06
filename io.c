@@ -3,11 +3,13 @@
 extern void listJobs(int num);
 extern void dispatch(Command comm);
 extern void dispatchBackground(Command comm);
+extern void moveToForeground(int pid);
 
 void printCommand(Command c){
+	printf("argc: %d, ", c.argc);
 	for(int i=0; c.argv[i]!=NULL;i++){
-		printf("%s", *(c.argv+i));
-	}
+		printf("%s,", *(c.argv+i));
+	}printf("\n");
 }
 
 //returns the number of times that any of the characters in delimiters occurs in the source string src
@@ -66,13 +68,21 @@ int execute(char* input){
 	input[strlen(input)-1]=0;
 	//printf("%s\n", input);
 	Command comm=processString(input);
-	//printCommand(comm);
+	printCommand(comm);
 
 	if(strcmp(comm.fname, "quit")==0){
 		//freeCommand(comm);
 		return 0;
 	}else if(strcmp(comm.fname, "listjobs")==0){
-		listJobs(-1);
+		if(comm.argc==1)
+			listJobs(-1);
+		else
+			listJobs(atoi(comm.argv[1]));
+	}else if(strcmp(comm.fname, "foreground")==0 || strcmp(comm.fname, "fg")==0){
+		if(comm.argc==1)
+			printf("Error, you must supply 1 argument (pid) for this command, for example: \"fg 2093\".");
+		else
+			moveToForeground(atoi(comm.argv[1]));
 	}else{//if it isn't any of the recognized built in commands, then do something else
 		if(comm.background){
 			dispatchBackground(comm);
